@@ -1,6 +1,7 @@
 *.md
 !README.md
 html
+dist/
 
 # User-specific stuff:
 .idea/workspace.xml
