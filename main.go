@@ -10,10 +10,12 @@ import (
 	"strings"
 
 	md "github.com/shurcooL/github_flavored_markdown"
+	"sync"
 )
 
 var filePath string
 var dirPath string
+var re = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
 
 func main() {
 	flag.StringVar(&filePath, "f", "", "mdg -f path/to/file")
@@ -23,48 +25,67 @@ func main() {
 	// list is a []string of markdown files
 	fileList := seekPrefixedFiles(".md")
 
+	var wg sync.WaitGroup
 	for _, file := range fileList {
-		f, err := os.Open(file)
-		if err != nil {
-			log.Println("Cannot open file", err)
-			return
-		}
-
-		fileContent, err := ioutil.ReadAll(f)
-		if err != nil {
-			log.Println("Cannot read content of file", err)
-			return
-		}
-
-		fileMenu := generateMenu(fileList)
-		for _, v := range fileContent {
-			fileMenu = append(fileMenu, v)
-		}
-		fileMenu = replaceTokens(fileMenu)
-		fileMenu = compileMarkdown(fileMenu)
-		fileMenu = appendCSS(fileMenu)
-
-		// basically I need to write the file like that once it's compiled lol
-		if _, err := os.Stat("html"); os.IsNotExist(err) {
-			os.Mkdir("html", 0777)
-		}
-
-		newFname := newFileName(file)
-		ioutil.WriteFile(newFname, fileMenu, 0777)
-
-		err = os.Rename(newFname, "html/" + newFname)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+		wg.Add(1)
+		go process(file, fileList, &wg)
 	}
+	wg.Wait();
+}
+
+func process(file string, fileList []string, wg *sync.WaitGroup) {
+	f, err := os.Open(file)
+	if err != nil {
+		log.Println("Cannot open file", err)
+		return
+	}
+
+	fileContent, err := ioutil.ReadAll(f)
+	if err != nil {
+		log.Println("Cannot read content of file", err)
+		return
+	}
+
+	fileMenu := generateMenu(fileList)
+	for _, v := range fileContent {
+		fileMenu = append(fileMenu, v)
+	}
+	fileMenu = replaceTokens(fileMenu)
+	fileMenu = compileMarkdown(fileMenu)
+	fileMenu = appendCSS(fileMenu)
+
+	// Ensure UTF-8 Encoding is properly appended to the document
+	fileMenu = []byte(ensureCharset() + string(fileMenu))
+
+	// basically I need to write the file like that once it's compiled lol
+	if _, err := os.Stat("html"); os.IsNotExist(err) {
+		os.Mkdir("html", 0777)
+	}
+
+	newFname := newFileName(file)
+	ioutil.WriteFile(newFname, fileMenu, 0777)
+
+	err = os.Rename(newFname, "html/" + newFname)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	wg.Done()
+}
+
+func ensureCharset() string {
+	return `<meta charset="UTF-8">`
 }
 
 func generateMenu(fileList []string) []byte {
+	if len(fileList) > 40 {
+		return []byte("")
+	}
+
 	menu := "#### Menu\n"
 	for _, file := range fileList {
 		f := strings.TrimSuffix(file, ".md")
-		menu += fmt.Sprintf("[%s]({{%s}})\n", f, f)
+		menu += fmt.Sprintf("- [%s]({{%s}})\n", f, f)
 	}
 	menu += "\n---\n\n"
 
@@ -77,20 +98,22 @@ func newFileName(name string) string {
 }
 
 func appendCSS(stream []byte) []byte {
-	temp := string(stream)
 	css, err := Asset("github-markdown.css")
 	if err != nil {
 		panic(err)
 	}
-	temp += fmt.Sprintf("<style>%s</style>", string(css))
 
-	return []byte(temp)
+	css = []byte(fmt.Sprintf("<style>%s</style>", string(css)))
+
+	for _, v := range css {
+		stream = append(stream, v)
+	}
+
+	return stream
 }
 
 func replaceTokens(stream []byte) []byte {
 	temp := string(stream)
-
-	var re = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
 
 	for _, match := range re.FindAllString(temp, -1) {
 		stripped := strings.Trim(match, "{}")
