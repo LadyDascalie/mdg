@@ -16,12 +16,14 @@ import (
 
 var filePath string
 var dirPath string
+var shouldMenu string
 var linksRegExp = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
 var charset = []byte("<meta charset=\"UTF-8\">")
 
 func main() {
 	flag.StringVar(&filePath, "f", "", "mdg -f path/to/file")
 	flag.StringVar(&dirPath, "d", ".", "mdg -d path/to/folder")
+	flag.StringVar(&shouldMenu, "m", "true", "mdg -m false")
 	flag.Parse()
 
 	// list is a []string of markdown files
@@ -48,11 +50,16 @@ func process(file string, fileList []string, wg *sync.WaitGroup) {
 		return
 	}
 
-	fileMenu := generateMenu(fileList)
-	for _, v := range fileContent {
-		fileMenu = append(fileMenu, v)
+	var fileMenu []byte
+	if shouldMenu == "true" {
+		fileMenu = generateMenu(fileList)
+		for _, v := range fileContent {
+			fileMenu = append(fileMenu, v)
+		}
+	} else {
+		fileMenu = fileContent
 	}
-	//fileMenu = replaceTokens(fileMenu)
+
 	fileMenu = compileMarkdown(fileMenu)
 	fileMenu = appendCSS(fileMenu)
 
