@@ -11,11 +11,13 @@ import (
 
 	md "github.com/shurcooL/github_flavored_markdown"
 	"sync"
+	"bytes"
 )
 
 var filePath string
 var dirPath string
-var re = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
+var linksRegExp = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
+var charset = []byte("<meta charset=\"UTF-8\">")
 
 func main() {
 	flag.StringVar(&filePath, "f", "", "mdg -f path/to/file")
@@ -55,7 +57,7 @@ func process(file string, fileList []string, wg *sync.WaitGroup) {
 	fileMenu = appendCSS(fileMenu)
 
 	// Ensure UTF-8 Encoding is properly appended to the document
-	fileMenu = []byte(ensureCharset() + string(fileMenu))
+	fileMenu = ensureCharset(fileMenu)
 
 	// basically I need to write the file like that once it's compiled lol
 	if _, err := os.Stat("html"); os.IsNotExist(err) {
@@ -73,8 +75,8 @@ func process(file string, fileList []string, wg *sync.WaitGroup) {
 	wg.Done()
 }
 
-func ensureCharset() string {
-	return `<meta charset="UTF-8">`
+func ensureCharset(file []byte) []byte {
+	return append(charset, file...)
 }
 
 func generateMenu(fileList []string) []byte {
@@ -98,12 +100,10 @@ func newFileName(name string) string {
 }
 
 func appendCSS(stream []byte) []byte {
-	css, err := Asset("github-markdown.css")
+	css, err := Asset("github-markdown.html")
 	if err != nil {
 		panic(err)
 	}
-
-	css = []byte(fmt.Sprintf("<style>%s</style>", string(css)))
 
 	for _, v := range css {
 		stream = append(stream, v)
@@ -113,15 +113,16 @@ func appendCSS(stream []byte) []byte {
 }
 
 func replaceTokens(stream []byte) []byte {
-	temp := string(stream)
+	buffer := bytes.NewBuffer(stream)
+	temp := buffer.Bytes()
 
-	for _, match := range re.FindAllString(temp, -1) {
-		stripped := strings.Trim(match, "{}")
-		linked := fmt.Sprint(stripped + ".html")
-		temp = strings.Replace(temp, match, linked, -1)
+	for _, match := range linksRegExp.FindAll(temp, -1) {
+		stripped := bytes.Trim(match, "{}")
+		linked := []byte(string(stripped) + ".html")
+		temp = bytes.Replace(temp, match, linked, -1)
 	}
 
-	return []byte(temp)
+	return temp
 }
 
 func compileMarkdown(text []byte) []byte {
