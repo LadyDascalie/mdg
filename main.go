@@ -52,7 +52,7 @@ func process(file string, fileList []string, wg *sync.WaitGroup) {
 	for _, v := range fileContent {
 		fileMenu = append(fileMenu, v)
 	}
-	fileMenu = replaceTokens(fileMenu)
+	//fileMenu = replaceTokens(fileMenu)
 	fileMenu = compileMarkdown(fileMenu)
 	fileMenu = appendCSS(fileMenu)
 
@@ -87,7 +87,7 @@ func generateMenu(fileList []string) []byte {
 	menu := "#### Menu\n"
 	for _, file := range fileList {
 		f := strings.TrimSuffix(file, ".md")
-		menu += fmt.Sprintf("- [%s]({{%s}})\n", f, f)
+		menu += fmt.Sprintf("- [%s](%s.html)\n", f, f)
 	}
 	menu += "\n---\n\n"
 
@@ -105,9 +105,7 @@ func appendCSS(stream []byte) []byte {
 		panic(err)
 	}
 
-	for _, v := range css {
-		stream = append(stream, v)
-	}
+	stream = append(css, stream...)
 
 	return stream
 }
