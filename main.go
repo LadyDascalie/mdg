@@ -9,27 +9,34 @@ import (
 	"regexp"
 	"strings"
 
-	md "github.com/shurcooL/github_flavored_markdown"
-	"sync"
 	"bytes"
+	"sync"
+
+	md "github.com/shurcooL/github_flavored_markdown"
 )
 
 var filePath string
 var dirPath string
-var shouldMenu string
+var skipMenu bool
 var linksRegExp = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
+
+// default utf8 charset
 var charset = []byte("<meta charset=\"UTF-8\">")
+
+// default path for the octicons icon set in cdn.js
+var octicons = []byte(`<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/octicons/4.4.0/font/octicons.css" integrity="sha256-4y5taf5SyiLyIqR9jL3AoJU216Rb8uBEDuUjBHO9tsQ=" crossorigin="anonymous" />`)
 
 // This ensures we never run more than 12 Goroutines at the same time
 // this prevents opening too many file descriptors without clearing them
 var semaphore = make(chan struct{}, 12)
+
 func main() {
 	flag.StringVar(&filePath, "f", "", "mdg -f path/to/file")
 	flag.StringVar(&dirPath, "d", ".", "mdg -d path/to/folder")
-	flag.StringVar(&shouldMenu, "m", "true", "mdg -m false")
+	flag.BoolVar(&skipMenu, "m", false, "mdg -m | Use to skip generating the menu")
 	flag.Parse()
 
-	// list is a []string of markdown files
+	// Get the list of markdown files in the current directory
 	fileList := seekPrefixedFiles(".md")
 
 	var wg sync.WaitGroup
@@ -37,7 +44,7 @@ func main() {
 		wg.Add(1)
 		go process(file, fileList, &wg)
 	}
-	wg.Wait();
+	wg.Wait()
 	close(semaphore)
 }
 
@@ -51,52 +58,66 @@ func process(file string, fileList []string, wg *sync.WaitGroup) {
 
 	// defer until after the semaphore is read from
 	defer wg.Done()
+
+	// Get a file descriptor
 	f, err := os.Open(file)
 	if err != nil {
 		log.Println("Cannot open file", err)
 		return
 	}
 
-	fileContent, err := ioutil.ReadAll(f)
+	// Read the contents of the open file
+	openedFile, err := ioutil.ReadAll(f)
 	if err != nil {
 		log.Println("Cannot read content of file", err)
 		return
 	}
 
-	var fileMenu []byte
-	if shouldMenu == "true" {
-		fileMenu = generateMenu(fileList)
-		for _, v := range fileContent {
-			fileMenu = append(fileMenu, v)
-		}
+
+	var fileContents []byte
+
+	// Skip menu if flag is set
+	if skipMenu {
+		fileContents = openedFile
 	} else {
-		fileMenu = fileContent
+		fileContents = generateMenu(fileList)
+		for _, v := range openedFile {
+			fileContents = append(fileContents, v)
+		}
 	}
 
-	fileMenu = compileMarkdown(fileMenu)
-	fileMenu = appendCSS(fileMenu)
+	// Compile and append styles
+	fileContents = compileMarkdown(fileContents)
+	fileContents = appendCSS(fileContents)
 
 	// Ensure UTF-8 Encoding is properly appended to the document
-	fileMenu = ensureCharset(fileMenu)
+	fileContents = ensureCharset(fileContents)
 
 	// basically I need to write the file like that once it's compiled lol
-	if _, err := os.Stat("html"); os.IsNotExist(err) {
+	if _, err = os.Stat("html"); os.IsNotExist(err) {
 		os.Mkdir("html", 0777)
 	}
 
-	newFname := newFileName(file)
-	ioutil.WriteFile(newFname, fileMenu, 0777)
+	// Name and save the file
+	newFileName := newFileName(file)
+	ioutil.WriteFile(newFileName, fileContents, 0777)
 
-	err = os.Rename(newFname, "html/" + newFname)
+	// Move the new file into th html sub-folder
+	// Overwrites are allowed
+	err = os.Rename(newFileName, "html/"+ newFileName)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	wg.Done()
 }
 
 func ensureCharset(file []byte) []byte {
 	return append(charset, file...)
+}
+
+// Not in use currently
+func ensureOcticons(file []byte) []byte {
+	return append(octicons, file...)
 }
 
 func generateMenu(fileList []string) []byte {
@@ -130,6 +151,7 @@ func appendCSS(stream []byte) []byte {
 	return stream
 }
 
+// Tokenizer not in use at the moment
 func replaceTokens(stream []byte) []byte {
 	buffer := bytes.NewBuffer(stream)
 	temp := buffer.Bytes()
