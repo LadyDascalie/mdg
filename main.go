@@ -20,6 +20,9 @@ var shouldMenu string
 var linksRegExp = regexp.MustCompile(`(?:\{\{)(.{1,})(?:\}\})`)
 var charset = []byte("<meta charset=\"UTF-8\">")
 
+// This ensures we never run more than 12 Goroutines at the same time
+// this prevents opening too many file descriptors without clearing them
+var semaphore = make(chan struct{}, 12)
 func main() {
 	flag.StringVar(&filePath, "f", "", "mdg -f path/to/file")
 	flag.StringVar(&dirPath, "d", ".", "mdg -d path/to/folder")
@@ -35,9 +38,19 @@ func main() {
 		go process(file, fileList, &wg)
 	}
 	wg.Wait();
+	close(semaphore)
 }
 
 func process(file string, fileList []string, wg *sync.WaitGroup) {
+	// If buffer is full, sending will be blocked
+	// And tasks will wait until space is cleared in the buffer
+	semaphore <- struct{}{}
+
+	// Once this goroutine is done, decrement the buffer by one
+	defer func() { <-semaphore }()
+
+	// defer until after the semaphore is read from
+	defer wg.Done()
 	f, err := os.Open(file)
 	if err != nil {
 		log.Println("Cannot open file", err)
