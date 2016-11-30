@@ -1,4 +1,4 @@
-# mdg 0.0.4
+# mdg 0.0.5
 
 **Check the releases tab for pre-compiled binaries**
 
