@@ -1,18 +1,19 @@
 package workers
 
 import (
-	"sync"
-	"os"
-	"io/ioutil"
-	"log"
 	"github.com/ladydascalie/mdg/config"
 	"github.com/ladydascalie/mdg/file/manipulate"
+	"io/ioutil"
+	"log"
+	"os"
+	"sync"
 )
 
-// This ensures we never run more than 12 Goroutines at the same time
+// Semaphore ensures we never run more than 12 Goroutines at the same time
 // this prevents opening too many file descriptors without clearing them
 var Semaphore = make(chan struct{}, 12)
 
+// Process is the worker that handles the markdown files
 func Process(file string, fileList []string, wg *sync.WaitGroup) {
 	// If buffer is full, sending will be blocked
 	// And tasks will wait until space is cleared in the buffer
@@ -70,7 +71,7 @@ func Process(file string, fileList []string, wg *sync.WaitGroup) {
 
 	// Move the new file into th html sub-folder
 	// Overwrites are allowed
-	err = os.Rename(newFileName, "html/" + newFileName)
+	err = os.Rename(newFileName, "html/"+newFileName)
 	if err != nil {
 		log.Println(err)
 		return

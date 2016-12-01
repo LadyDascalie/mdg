@@ -6,16 +6,16 @@ import (
 	"sync"
 
 	"github.com/ladydascalie/mdg/config"
-	"github.com/ladydascalie/mdg/workers"
 	"github.com/ladydascalie/mdg/file/manipulate"
+	"github.com/ladydascalie/mdg/workers"
 )
 
 func init() {
+	// Preload the CSS so it is immediately available
 	loadCSS()
 }
 
 func main() {
-	flag.StringVar(&config.FilePath, "f", "", "mdg -f path/to/file")
 	flag.StringVar(&config.DirPath, "d", ".", "mdg -d path/to/folder")
 	flag.BoolVar(&config.SkipMenu, "m", false, "mdg -m | Use to skip generating the menu")
 	flag.Parse()
@@ -45,4 +45,3 @@ func loadCSS() {
 		panic(err)
 	}
 }
-
