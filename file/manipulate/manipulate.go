@@ -1,12 +1,13 @@
 package manipulate
 
 import (
-	"strings"
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"strings"
+
 	"github.com/ladydascalie/mdg/config"
 	md "github.com/shurcooL/github_flavored_markdown"
-	"io/ioutil"
-	"bytes"
 )
 
 // EnsureCharset appends the HTML meta tag
@@ -49,6 +50,7 @@ func extractSuffix(name string) (string, error) {
 	return "", fmt.Errorf("%s", "Could not derive suffix")
 }
 
+// NewFileName ...
 func NewFileName(name string) string {
 	suffix, err := extractSuffix(name)
 	if err != nil {
@@ -58,7 +60,6 @@ func NewFileName(name string) string {
 	name = strings.TrimSuffix(name, suffix)
 	return name + ".html"
 }
-
 
 // Tokenizer not in use at the moment
 func replaceTokens(stream []byte) []byte {
@@ -74,15 +75,19 @@ func replaceTokens(stream []byte) []byte {
 	return temp
 }
 
+// AppendCSS appends any CSS byte stream to the file
 func AppendCSS(css, stream []byte) []byte {
 	stream = append(css, stream...)
 	return stream
 }
 
+// CompileMarkdown compiles the markdown to html
 func CompileMarkdown(text []byte) []byte {
 	return md.Markdown(text)
 }
 
+// FindFilesOfType loops through the provided file extensions
+// and returns a slice containing the names of matching files
 func FindFilesOfType(extensions []string) []string {
 	files, err := ioutil.ReadDir(config.DirPath)
 	if err != nil {
