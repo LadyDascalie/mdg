@@ -18,13 +18,13 @@ func init() {
 func main() {
 	flag.StringVar(&config.DirPath, "d", ".", "mdg -d path/to/folder")
 	flag.BoolVar(&config.SkipMenu, "m", false, "mdg -m | Use to skip generating the menu")
+	flag.IntVar(&workers.Threads, "c", 12, "mdg -c 20 | Use to decide how many threads are available")
 	flag.Parse()
 
 	// Get the list of markdown files in the current directory
 	fileList := manipulate.FindFilesOfType(config.FileExtensions)
 
 	if len(fileList) == 0 {
-		// Abort if no files found
 		fmt.Println("No markdown files found in folder.\nAborting...")
 		return
 	}
