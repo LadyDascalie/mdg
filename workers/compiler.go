@@ -9,9 +9,13 @@ import (
 	"sync"
 )
 
-// Semaphore ensures we never run more than 12 Goroutines at the same time
+// Threads is the default number of threads allowed to run at any one time
+// This can be set via the -c CLI flag as well
+var Threads = 12
+
+// Semaphore ensures we never run more than 12 (DEFAULT) Goroutines at the same time
 // this prevents opening too many file descriptors without clearing them
-var Semaphore = make(chan struct{}, 12)
+var Semaphore = make(chan struct{}, Threads)
 
 // Process is the worker that handles the markdown files
 func Process(file string, fileList []string, wg *sync.WaitGroup) {
