@@ -1,12 +1,13 @@
 package workers
 
 import (
-	"github.com/ladydascalie/mdg/config"
-	"github.com/ladydascalie/mdg/file/manipulate"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/ladydascalie/mdg/config"
+	"github.com/ladydascalie/mdg/file/manipulate"
 )
 
 // Threads is the default number of threads allowed to run at any one time
@@ -66,12 +67,16 @@ func Process(file string, fileList []string, wg *sync.WaitGroup) {
 
 	// basically I need to write the file like that once it's compiled lol
 	if _, err = os.Stat("html"); os.IsNotExist(err) {
-		os.Mkdir("html", 0777)
+		if err := os.Mkdir("html", 0777); err != nil {
+			log.Fatalln("Could not create 'html' directory:\n", err)
+		}
 	}
 
 	// Name and save the file
 	newFileName := manipulate.NewFileName(file)
-	ioutil.WriteFile(newFileName, fileContents, 0777)
+	if err := ioutil.WriteFile(newFileName, fileContents, 0777); err != nil {
+		log.Fatalln("Could not write file to disk:\n", err)
+	}
 
 	// Move the new file into th html sub-folder
 	// Overwrites are allowed
